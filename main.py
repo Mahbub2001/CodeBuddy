@@ -14,7 +14,8 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains import LLMChain, ConversationalRetrievalChain
 from templates import css, bot_template, user_template
-from database import create_users_db, create_messages_db, create_documents_db, write_to_messages_db, get_all_thread_messages, \
+from code_editor import code_editor_view
+from database import create_messages_db, create_documents_db, write_to_messages_db, get_all_thread_messages, \
     get_unique_thread_ids, get_uploaded_doc_names
 from prompts import CHAT_TEMPLATE, INITIAL_TEMPLATE
 from prompts import CORRECTION_CONTEXT, COMPLETION_CONTEXT, OPTIMIZATION_CONTEXT, GENERAL_ASSISTANT_CONTEXT, \
@@ -51,17 +52,14 @@ def page_title_header():
     top_image = Image.open('logo.png')
     with open('logo.png', "rb") as image_file:
         encoded_image = base64.b64encode(image_file.read()).decode()
-
     st.markdown(
         f"""
         <div style="text-align: center;">
             <img src="data:image/png;base64,{encoded_image}" alt="logo" style="width: 200px; margin-bottom: 10px;">
-            <h1 style="font-size: 28px;">CodeBuddy - Your Programming Assistant</h1>
         </div>
         """,
         unsafe_allow_html=True
     )
-
 
 def get_pdf_text(pdf_docs):
     text = ""
@@ -105,20 +103,6 @@ def create_llm_chain(prompt_template):
     llm = Ollama(model="llama3.1:latest", temperature=temperature)
     return LLMChain(llm=llm, prompt=prompt_template, memory=memory)
 
-
-def approve_password(password):
-    if len(password) >= 8 and re.search(r"(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[_@$#!?&*%])", password):
-        return True
-    return False
-
-
-def approve_email(email):
-    email_regex = '^[a-zA-Z0-9]+[\._]?[a-zA-Z0-9]+[@]\w+[.]\w{2,3}$'
-    if re.search(email_regex, email):
-        return True
-    else:
-        return False
-
 def sidebar():
     global language, scenario, temperature, model, scenario_context, libraries, pdf_docs, uploaded_docs
     languages = sorted(['Python', 'GoLang', 'TypeScript', 'JavaScript', 'Java', 'C', 'C++', 'C#', 'R', 'SQL'])
@@ -139,7 +123,6 @@ def sidebar():
     }
 
     with st.sidebar:
-        # user_authentication_tab()
         if st.session_state:
             with st.expander(label="Settings", expanded=True):
                 coding_settings_tab, chatbot_settings_tab = st.tabs(['Coding', 'ChatBot'])
@@ -304,7 +287,6 @@ def user_message():
                     message=f"AI: {chat_response}"
                 )
 
-
 def display_file_code(filename):
     with open(filename, "r") as file:
         with st.expander(filename, expanded=False):
@@ -318,27 +300,52 @@ def display_history():
         elif message.startswith("AI:"):
             st.markdown(f"_{message}_")
 
+def reduce_sidebar_width():
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] {
+            min-width: 200px !important;
+        }
+        .block-container {
+            max-width: 100% !important;  /* Ensure main content expands */
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 def main():
     config()
-    create_users_db()
+    reduce_sidebar_width() 
     create_messages_db()
     init_ses_states()
-    page_title_header()
     sidebar()
-    if st.session_state:
-        if st.session_state.docs_processed:
-            deploy_tab,docs_tab = st.tabs(['Chat Here','Doc Analysis'])
-            with docs_tab:
-                st.caption("Coming Soon")
+
+    if "docs_processed" in st.session_state and st.session_state.docs_processed:
+        code_editor, deploy_tab, docs_tab = st.tabs(['Code Editor', 'Chat Here', 'Doc Analysis'])
+    else:
+        code_editor, deploy_tab = st.tabs(['Code Editor', 'Chat Here'])
+        docs_tab = None  
+
+    with deploy_tab:
+        st.container()  
+        page_title_header()
+        user_initial_submit()
+        user_message()
+        display_history()
+
+    if docs_tab:
+        with docs_tab:
+            st.caption("Coming Soon")
+            if st.session_state.uploaded_docs:
                 for pdf in st.session_state.uploaded_docs:
                     st.caption(pdf.name)
-        else:
-            deploy_tab = st.tabs(['Chat Here'])[0]
-        with deploy_tab:
-            user_initial_submit()
-            user_message()
-            display_history()
+            else:
+                st.write("No documents uploaded yet.")
 
-if __name__ == '__main__':
+    with code_editor:
+        code_editor_view()
+
+if __name__ == "__main__":
     main()

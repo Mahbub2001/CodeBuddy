@@ -1,20 +1,5 @@
 import sqlite3
 
-
-def create_users_db():
-    conn = sqlite3.connect('MASTER.db')
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Users (
-            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT,
-            password TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-
 def create_messages_db():
     conn = sqlite3.connect('MASTER.db')
     cursor = conn.cursor()
