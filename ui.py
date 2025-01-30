@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QFont, QTextCharFormat, QColor, QSyntaxHighlighter
 from PyQt6.QtCore import Qt, QRegularExpression
+import subprocess
+import tempfile
 
 class CodeEditor(QPlainTextEdit):
     def __init__(self, parent=None):
@@ -35,10 +37,10 @@ class SyntaxHighlighter(QSyntaxHighlighter):
                 self.setFormat(match.capturedStart(), match.capturedLength(), fmt)
 
 class IDE(QMainWindow):
-    # Main IDE Window with VS Code-like styling and AI panel 
+    # Main IDE Window 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("VS Code Style C IDE")
+        self.setWindowTitle("CODEBUDDY")
         self.setGeometry(100, 100, 1200, 800)
         self.initUI()
 
@@ -127,34 +129,44 @@ class IDE(QMainWindow):
             self.tabWidget.setTabText(self.tabWidget.currentIndex(), os.path.basename(fileName))
     
     def clear_output(self):
-        # Clear the output console 
         self.outputConsole.clear()
     
     def compile_and_run(self):
-        # Compile and execute the C code
         editor = self.get_current_editor()
         if not editor:
             return
-        
+
         code = editor.toPlainText()
         if not code.strip():
             self.outputConsole.setText("⚠️ No code to compile!")
             return
         
-        tempFile = "temp.c"
-        with open(tempFile, "w") as file:
-            file.write(code)
-        
-        outputExe = "temp.exe" if os.name == "nt" else "./temp.out"
-        compileCommand = f"gcc {tempFile} -o {outputExe} 2>&1"
-        compileResult = os.popen(compileCommand).read()
-        
-        if compileResult:
-            self.outputConsole.setText(f"❌ Compilation Error:\n\n{compileResult}")
-            return
-        
-        executionResult = os.popen(outputExe).read()
-        self.outputConsole.setText(f"✅ Output:\n\n{executionResult}")
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_file = os.path.join(tempdir, 'temp.out')
+            compileCommand = ['gcc', '-x', 'c', '-', '-o', output_file] 
+
+            try:
+                compileProcess = subprocess.Popen(
+                    compileCommand, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
+                compileStdout, compileStderr = compileProcess.communicate(input=code.encode('utf-8'))
+                if compileProcess.returncode != 0:
+                    self.outputConsole.setText(f"❌ Compilation Error:\n\n{compileStderr.decode()}")
+                    return
+
+                runProcess = subprocess.Popen(
+                    output_file, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
+
+                executionStdout, executionStderr = runProcess.communicate()
+
+                if executionStderr:
+                    self.outputConsole.setText(f"❌ Execution Error:\n\n{executionStderr.decode()}")
+                else:
+                    self.outputConsole.setText(f"✅ Output:\n\n{executionStdout.decode()}")
+
+            except Exception as e:
+                self.outputConsole.setText(f"⚠️ Error occurred: {str(e)}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
