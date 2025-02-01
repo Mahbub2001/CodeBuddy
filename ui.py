@@ -174,40 +174,52 @@ class IDE(QMainWindow):
         layout = QHBoxLayout()
         centralWidget.setLayout(layout)
 
-        # Left Side Explorer Sidebar 20%
-        self.explorer = ExplorerSidebar(self)
-        layout.addWidget(self.explorer, 1) 
+        self.mainSplitter = QSplitter(Qt.Orientation.Horizontal)
+        layout.addWidget(self.mainSplitter)
 
-        # Middle editor 60% 
-        middleContent = QWidget()
-        middleLayout = QVBoxLayout()
-        middleContent.setLayout(middleLayout)
+        self.leftSidebar = QWidget()
+        self.leftSidebarLayout = QVBoxLayout()
+        self.leftSidebar.setLayout(self.leftSidebarLayout)
+
+        self.explorer = ExplorerSidebar(self)
+        self.leftSidebarLayout.addWidget(self.explorer)
+        self.mainSplitter.addWidget(self.leftSidebar)  
+
+        self.middleContent = QWidget()
+        self.middleLayout = QVBoxLayout()
+        self.middleContent.setLayout(self.middleLayout)
 
         self.tabWidget = QTabWidget()
         self.add_new_tab()
-        middleLayout.addWidget(self.tabWidget, 4)  
+        self.middleLayout.addWidget(self.tabWidget, 4) 
 
         self.outputConsole = QTextEdit()
         self.outputConsole.setFont(QFont("Courier", 11))
         self.outputConsole.setReadOnly(True)
         self.outputConsole.setPlaceholderText("Compilation and execution output will appear here...")
-        middleLayout.addWidget(self.outputConsole, 1)  
+        self.middleLayout.addWidget(self.outputConsole, 1)
 
-        layout.addWidget(middleContent, 3)  
+        self.mainSplitter.addWidget(self.middleContent) 
 
-        # Right Side AI Assistant 20% 
+        self.rightSidebar = QWidget()
+        self.rightSidebarLayout = QVBoxLayout()
+        self.rightSidebar.setLayout(self.rightSidebarLayout)
+
         self.aiPanel = QTextBrowser()
         self.aiPanel.setFont(QFont("Arial", 11))
         self.aiPanel.setText("💡 AI Code Assistant: Ask for help, explanations, and suggestions here.")
         self.aiPanel.setReadOnly(True)
-        layout.addWidget(self.aiPanel, 1) 
+        self.rightSidebarLayout.addWidget(self.aiPanel)
+        self.mainSplitter.addWidget(self.rightSidebar)  
+
+        self.mainSplitter.setSizes([200, 600, 200])
 
         self.initToolBar()
 
     def initAutoSave(self):
         self.autoSaveTimer = QTimer(self)
         self.autoSaveTimer.timeout.connect(self.autoSave)
-        self.autoSaveTimer.start(5000)  # Auto save every 5 seconds
+        self.autoSaveTimer.start(5000)  
 
     def autoSave(self):
         editor = self.get_current_editor()
