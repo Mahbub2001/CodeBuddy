@@ -15,8 +15,8 @@ from langchain.vectorstores import FAISS
 from langchain.chains import LLMChain, ConversationalRetrievalChain
 from templates import css, bot_template, user_template
 from code_editor import code_editor_view
-from database import create_messages_db, create_documents_db, write_to_messages_db, get_all_thread_messages, \
-    get_unique_thread_ids, get_uploaded_doc_names
+from database import create_messages_db, write_to_messages_db, get_all_thread_messages, \
+    get_unique_thread_ids
 from prompts import CHAT_TEMPLATE, INITIAL_TEMPLATE
 from prompts import CORRECTION_CONTEXT, COMPLETION_CONTEXT, OPTIMIZATION_CONTEXT, GENERAL_ASSISTANT_CONTEXT, \
     GENERATION_CONTEXT, COMMENTING_CONTEXT, EXPLANATION_CONTEXT, LEETCODE_CONTEXT, SHORTENING_CONTEXT
