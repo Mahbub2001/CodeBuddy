@@ -186,7 +186,7 @@ class CodeBuddyConsole:
         return FAISS.from_texts(texts=text_chunks, embedding=embeddings)
     
     def create_retrieval_chain(self, vectorstore):
-        llm = Ollama(model="llama3.1:latest", temperature=self.current_state['temperature'])
+        llm = Ollama(model="qwen2.5-coder:7b", temperature=self.current_state['temperature'])
         memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
         return ConversationalRetrievalChain.from_llm(
             llm=llm,
@@ -196,7 +196,7 @@ class CodeBuddyConsole:
     
     def create_llm_chain(self, prompt_template):
         memory = ConversationBufferMemory(input_key="input", memory_key="chat_history")
-        llm = Ollama(model="llama3.1:latest", temperature=self.current_state['temperature'])
+        llm = Ollama(model="qwen2.5-coder:7b", temperature=self.current_state['temperature'])
         return LLMChain(llm=llm, prompt=prompt_template, memory=memory)
     
     def start_new_chat(self):
