@@ -9,6 +9,8 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt, QTimer
 from editor import CodeEditor
 from explorer_sidebar import ExplorerSidebar
+
+from main import CodeBuddyConsole
 class IDE(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -16,6 +18,8 @@ class IDE(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
         self.initUI()
         self.initAutoSave()
+        
+        self.code_buddy = CodeBuddyConsole()
 
     def initUI(self):
         centralWidget = QWidget(self)
@@ -217,17 +221,27 @@ class IDE(QMainWindow):
 
     def assist_code(self):
         editor = self.get_current_editor()
-        if not editor:
-            return
-
-        code = editor.toPlainText()
-        if not code.strip():
-            self.outputConsole.setText("⚠️ No code to assist!")
-            return
-
         assistant = self.assistantSelector.currentText()
+        code_optional_scenarios = ["Code Generation", "LeetCode Solver"]
+        if assistant not in code_optional_scenarios:
+            if not editor or not editor.toPlainText().strip():
+                self.outputConsole.setText("⚠️ No code to assist!")
+                return
+            code = editor.toPlainText()
+        else:
+            code = ""  
+
         prompt = self.aiPanel.toPlainText()
         if not prompt.strip():
             self.aiPanel.setText("💡 AI Code Assistant: Please write a prompt!")
             return
-        self.aiPanel.setText(f"💡 AI Code Assistant: {assistant} feature is not yet implemented.\n\nYour Prompt: {prompt}")
+
+        language = self.languageSelector.currentText().lower()
+
+        try:
+            response = self.code_buddy.process_query(language, code, prompt, assistant)
+            self.aiPanel.setText(f"💡 AI Code Assistant ({assistant}):\n\n{response}")
+        except ValueError as e:
+            self.aiPanel.setText(f"⚠️ Error: {str(e)}")
+        except Exception as e:
+            self.aiPanel.setText(f"⚠️ An unexpected error occurred: {str(e)}")

@@ -17,7 +17,6 @@ from prompts import (
     LEETCODE_CONTEXT, SHORTENING_CONTEXT
 )
 from database import create_messages_db, write_to_messages_db, get_all_thread_messages,get_unique_thread_ids
-# Core application functionality
 class CodeBuddyConsole:
     def __init__(self):
         self.current_state = {
@@ -36,21 +35,60 @@ class CodeBuddyConsole:
         }
         
         self.scenario_map = {
-            "1": ("General Assistant", GENERAL_ASSISTANT_CONTEXT),
-            "2": ("Code Correction", CORRECTION_CONTEXT),
-            "3": ("Code Completion", COMPLETION_CONTEXT),
-            "4": ("Code Optimization", OPTIMIZATION_CONTEXT),
-            "5": ("Code Generation", GENERATION_CONTEXT),
-            "6": ("Code Commenting", COMMENTING_CONTEXT),
-            "7": ("Code Explanation", EXPLANATION_CONTEXT),
-            "8": ("LeetCode Solver", LEETCODE_CONTEXT),
-            "9": ("Code Shortener", SHORTENING_CONTEXT)
+            "General Assistant": GENERAL_ASSISTANT_CONTEXT,
+            "Code Correction": CORRECTION_CONTEXT,
+            "Code Completion": COMPLETION_CONTEXT,
+            "Code Optimization": OPTIMIZATION_CONTEXT,
+            "Code Generation": GENERATION_CONTEXT,
+            "Code Commenting": COMMENTING_CONTEXT,
+            "Code Explanation": EXPLANATION_CONTEXT,
+            "LeetCode Solver": LEETCODE_CONTEXT,
+            "Code Shortener": SHORTENING_CONTEXT
         }
         
         self.languages = ['Python', 'GoLang', 'TypeScript', 'JavaScript', 
                          'Java', 'C', 'C++', 'C#', 'R', 'SQL']
         
         create_messages_db()
+    
+    def process_query(self,language, code, query, scenario):
+        """Process a query with the given code and scenario, returning the AI's response."""
+        if scenario not in self.scenario_map:
+            raise ValueError(f"Invalid scenario. Choose from: {list(self.scenario_map.keys())}")
+        
+        self.current_state['scenario'] = scenario
+        self.current_state['scenario_context'] = self.scenario_map[scenario]
+        self.current_state['language'] = language
+        
+        initial_template = PromptTemplate(
+            input_variables=['input', 'language', 'scenario', 'scenario_context', 'code_context', 'libraries'],
+            template=INITIAL_TEMPLATE
+        )
+        
+        if self.current_state['docs_processed']:
+            chain = self.current_state['docs_chain']
+            llm_input = initial_template.format(
+                input=code,
+                code_context=query,
+                language=self.current_state['language'],
+                scenario=self.current_state['scenario'],
+                scenario_context=self.current_state['scenario_context'],
+                libraries=self.current_state['libraries']
+            )
+            response = chain({'question': llm_input})['answer']
+        else:
+            chain = self.create_llm_chain(initial_template)
+            response = chain.run(
+                input=code,
+                code_context=query,
+                language=self.current_state['language'],
+                scenario=self.current_state['scenario'],
+                scenario_context=self.current_state['scenario_context'],
+                libraries=self.current_state['libraries']
+            )
+        
+        return response
+
     
     def clear_screen(self):
         os.system('cls' if os.name == 'nt' else 'clear')
