@@ -3,13 +3,12 @@ import tempfile
 import subprocess
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QTextEdit,
-    QTextBrowser, QToolBar, QPushButton, QSplitter, QFileDialog, QMessageBox
+    QTextBrowser, QToolBar, QPushButton, QSplitter, QFileDialog, QMessageBox,QComboBox, QLabel, QFrame
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt, QTimer
 from editor import CodeEditor
 from explorer_sidebar import ExplorerSidebar
-
 class IDE(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -27,6 +26,7 @@ class IDE(QMainWindow):
         self.mainSplitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(self.mainSplitter)
 
+        # Left Sidebar (Explorer)
         self.leftSidebar = QWidget()
         self.leftSidebarLayout = QVBoxLayout()
         self.leftSidebar.setLayout(self.leftSidebarLayout)
@@ -55,11 +55,34 @@ class IDE(QMainWindow):
         self.rightSidebarLayout = QVBoxLayout()
         self.rightSidebar.setLayout(self.rightSidebarLayout)
 
-        self.aiPanel = QTextBrowser()
+        self.rightControls = QFrame()
+        self.rightControlsLayout = QVBoxLayout()
+        self.rightControls.setLayout(self.rightControlsLayout)
+
+        self.languageSelector = QComboBox()
+        self.languageSelector.addItems(["C", "C++", "Java", "Python"])
+        self.rightControlsLayout.addWidget(QLabel("Language:"))
+        self.rightControlsLayout.addWidget(self.languageSelector)
+
+        self.assistantSelector = QComboBox()
+        self.assistantSelector.addItems([
+            "General Assistant", "Code Correction", "Code Completion", "Code Optimization",
+            "Code Generation", "Code Commenting", "Code Explanation", "LeetCode Solver", "Code Shortener"
+        ])
+        self.rightControlsLayout.addWidget(QLabel("Assistant:"))
+        self.rightControlsLayout.addWidget(self.assistantSelector)
+
+        self.assistButton = QPushButton("Assist")
+        self.assistButton.clicked.connect(self.assist_code)
+        self.rightControlsLayout.addWidget(self.assistButton)
+
+        self.rightSidebarLayout.addWidget(self.rightControls)
+
+        self.aiPanel = QTextEdit()
         self.aiPanel.setFont(QFont("Arial", 11))
-        self.aiPanel.setText("💡 AI Code Assistant: Ask for help, explanations, and suggestions here.")
-        self.aiPanel.setReadOnly(True)
+        self.aiPanel.setPlaceholderText("💡 AI Code Assistant: Write your prompt here...")
         self.rightSidebarLayout.addWidget(self.aiPanel)
+
         self.mainSplitter.addWidget(self.rightSidebar)
 
         self.mainSplitter.setSizes([200, 600, 200])
@@ -109,7 +132,7 @@ class IDE(QMainWindow):
         return self.tabWidget.currentWidget()
 
     def open_file(self):
-        fileName, _ = QFileDialog.getOpenFileName(self, "Open C File", "", "C Files (*.c)")
+        fileName, _ = QFileDialog.getOpenFileName(self, "Open File", "", "All Files (*)")
         if fileName:
             editor = self.get_current_editor()
             with open(fileName, "r") as file:
@@ -126,7 +149,7 @@ class IDE(QMainWindow):
             with open(editor.file_path, "w") as file:
                 file.write(editor.toPlainText())
         else:
-            fileName, _ = QFileDialog.getSaveFileName(self, "Save C File", "", "C Files (*.c)")
+            fileName, _ = QFileDialog.getSaveFileName(self, "Save File", "", "All Files (*)")
             if fileName:
                 with open(fileName, "w") as file:
                     file.write(editor.toPlainText())
@@ -146,22 +169,41 @@ class IDE(QMainWindow):
             self.outputConsole.setText("⚠️ No code to compile!")
             return
 
+        language = self.languageSelector.currentText().lower()
         with tempfile.TemporaryDirectory() as tempdir:
             output_file = os.path.join(tempdir, 'temp.out')
-            compileCommand = ['gcc', '-x', 'c', '-', '-o', output_file]
+            if language == "c":
+                compileCommand = ['gcc', '-x', 'c', '-', '-o', output_file]
+            elif language == "c++":
+                compileCommand = ['g++', '-x', 'c++', '-', '-o', output_file]
+            elif language == "java":
+                compileCommand = ['javac', '-d', tempdir, '-']
+                output_file = os.path.join(tempdir, 'Main')
+            elif language == "python":
+                compileCommand = ['python3', '-c', code]
+                output_file = None
+            else:
+                self.outputConsole.setText("❌ Unsupported language!")
+                return
 
             try:
-                compileProcess = subprocess.Popen(
-                    compileCommand, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                )
-                compileStdout, compileStderr = compileProcess.communicate(input=code.encode('utf-8'))
-                if compileProcess.returncode != 0:
-                    self.outputConsole.setText(f"❌ Compilation Error:\n\n{compileStderr.decode()}")
-                    return
+                if language != "python":
+                    compileProcess = subprocess.Popen(
+                        compileCommand, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    )
+                    compileStdout, compileStderr = compileProcess.communicate(input=code.encode('utf-8'))
+                    if compileProcess.returncode != 0:
+                        self.outputConsole.setText(f"❌ Compilation Error:\n\n{compileStderr.decode()}")
+                        return
 
-                runProcess = subprocess.Popen(
-                    output_file, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                )
+                if language == "python":
+                    runProcess = subprocess.Popen(
+                        compileCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    )
+                else:
+                    runProcess = subprocess.Popen(
+                        output_file, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    )
 
                 executionStdout, executionStderr = runProcess.communicate()
 
@@ -172,3 +214,20 @@ class IDE(QMainWindow):
 
             except Exception as e:
                 self.outputConsole.setText(f"⚠️ Error occurred: {str(e)}")
+
+    def assist_code(self):
+        editor = self.get_current_editor()
+        if not editor:
+            return
+
+        code = editor.toPlainText()
+        if not code.strip():
+            self.outputConsole.setText("⚠️ No code to assist!")
+            return
+
+        assistant = self.assistantSelector.currentText()
+        prompt = self.aiPanel.toPlainText()
+        if not prompt.strip():
+            self.aiPanel.setText("💡 AI Code Assistant: Please write a prompt!")
+            return
+        self.aiPanel.setText(f"💡 AI Code Assistant: {assistant} feature is not yet implemented.\n\nYour Prompt: {prompt}")

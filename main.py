@@ -1,11 +1,8 @@
 import os
 import re
-from PIL import Image
 import sqlite3
 import base64
-import streamlit as st
 from PyPDF2 import PdfReader
-from werkzeug.utils import secure_filename
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.llms import Ollama
 from langchain.memory import ConversationBufferMemory
@@ -13,339 +10,325 @@ from langchain.prompts import PromptTemplate
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains import LLMChain, ConversationalRetrievalChain
-from templates import css, bot_template, user_template
-from code_editor import code_editor_view
-from database import create_messages_db, write_to_messages_db, get_all_thread_messages, \
-    get_unique_thread_ids
-from prompts import CHAT_TEMPLATE, INITIAL_TEMPLATE
-from prompts import CORRECTION_CONTEXT, COMPLETION_CONTEXT, OPTIMIZATION_CONTEXT, GENERAL_ASSISTANT_CONTEXT, \
-    GENERATION_CONTEXT, COMMENTING_CONTEXT, EXPLANATION_CONTEXT, LEETCODE_CONTEXT, SHORTENING_CONTEXT
-
-def config():
-    st.set_page_config(
-        page_title="CodeBuddy",
-        page_icon="🤖",
-        layout="centered",
-        initial_sidebar_state="expanded"
-    )
-    st.markdown(css, unsafe_allow_html=True)
-
-
-def init_ses_states():
-    default_values = {
-        'chat_history': [],
-        'initial_input': "",
-        'initial_context': "",
-        'scenario_context': "",
-        'thread_id': "",
-        'docs_processed': False,
-        'docs_chain': None,
-        'user_authenticated': False,
-        'uploaded_docs': None,
-        'current_user_id': None
-    }
-    for key, value in default_values.items():
-        st.session_state.setdefault(key, value)
-
-
-def page_title_header():
-    top_image = Image.open('logo.png')
-    with open('logo.png', "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode()
-    st.markdown(
-        f"""
-        <div style="text-align: center;">
-            <img src="data:image/png;base64,{encoded_image}" alt="logo" style="width: 200px; margin-bottom: 10px;">
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-def get_pdf_text(pdf_docs):
-    text = ""
-    for pdf in pdf_docs:
-        pdf_reader = PdfReader(pdf)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-    return text
-
-
-def get_text_chunks(text):
-    text_splitter = CharacterTextSplitter(
-        separator="\n",
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len
-    )
-    chunks = text_splitter.split_text(text)
-    return chunks
-
-
-def get_vectorstore(text_chunks):
-    embeddings = OpenAIEmbeddings()
-    vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
-    return vectorstore
-
-
-def create_retrieval_chain(vectorstore):
-    llm = Ollama(model="llama3.1:latest", temperature=temperature)
-    memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
-    conversation_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=vectorstore.as_retriever(),
-        memory=memory
-    )
-    return conversation_chain
-
-
-def create_llm_chain(prompt_template):
-    memory = ConversationBufferMemory(input_key="input", memory_key="chat_history")
-    llm = Ollama(model="llama3.1:latest", temperature=temperature)
-    return LLMChain(llm=llm, prompt=prompt_template, memory=memory)
-
-def sidebar():
-    global language, scenario, temperature, model, scenario_context, libraries, pdf_docs, uploaded_docs
-    languages = sorted(['Python', 'GoLang', 'TypeScript', 'JavaScript', 'Java', 'C', 'C++', 'C#', 'R', 'SQL'])
-    python_libs = sorted(['SQLite', 'PyGame', 'Seaborn', "Pandas", 'Numpy', 'Scipy', 'Scikit-Learn', 'PyTorch',
-                          'TensorFlow', 'Streamlit', 'Flask', 'FastAPI'])
-    scenarios = ['General Assistant', 'Code Correction', 'Code Completion', 'Code Commenting', 'Code Optimization',
-                 'Code Shortener', 'Code Generation', 'Code Explanation', 'LeetCode Solver']
-    scenario_context_map = {
-        "Code Correction": CORRECTION_CONTEXT,
-        "Code Completion": COMPLETION_CONTEXT,
-        "Code Optimization": OPTIMIZATION_CONTEXT,
-        "General Assistant": GENERAL_ASSISTANT_CONTEXT,
-        "Code Generation": GENERATION_CONTEXT,
-        "Code Commenting": COMMENTING_CONTEXT,
-        "Code Explanation": EXPLANATION_CONTEXT,
-        "LeetCode Solver": LEETCODE_CONTEXT,
-        "Code Shortener": SHORTENING_CONTEXT,
-    }
-
-    with st.sidebar:
-        if st.session_state:
-            with st.expander(label="Settings", expanded=True):
-                coding_settings_tab, chatbot_settings_tab = st.tabs(['Coding', 'ChatBot'])
-                with coding_settings_tab:
-                    language = st.selectbox(label="Language", options=languages)
-                    if language == "Python":
-                        libraries = st.multiselect(label="Libraries", options=python_libs)
-                        if not libraries:
-                            libraries = ""
-                    else:
-                        libraries = ""
-                    scenario = st.selectbox(label="Scenario", options=scenarios, index=0)
-                    scenario_context = scenario_context_map.get(scenario, "")
-
-                with chatbot_settings_tab:
-                    temperature = st.slider(label="Temperature", min_value=0.0, max_value=1.0, value=0.5)
-
-            with st.expander(label="Embed Documents", expanded=True):
-                pdf_docs = st.file_uploader("Upload Docs Here", type=['PDF'], accept_multiple_files=True)
-                if pdf_docs:
-                    if st.button("Process Docs"):
-                        st.session_state.uploaded_docs = pdf_docs
-                        raw_text = get_pdf_text(pdf_docs)
-                        text_chunks = get_text_chunks(raw_text)
-                        vectorstore = get_vectorstore(text_chunks)
-                        initial_llm_chain = create_retrieval_chain(vectorstore=vectorstore)
-                        st.session_state.docs_chain = initial_llm_chain
-                        st.session_state.docs_processed = True
-                else:
-                    st.session_state.docs_processed = False
-                if st.session_state.docs_processed:
-                    st.write("Docs Successfully Processed:")
-                    for i, pdf in enumerate(st.session_state.uploaded_docs):
-                        st.caption(f"{i + 1}. {str(secure_filename(pdf.name))}")
-
-            with st.expander("Previous Chats", expanded=True):
-                selected_thread_id = st.selectbox(label="Previous Thread IDs", options=get_unique_thread_ids(), index=0)
-                if st.button("Render Chat"):
-                    st.session_state.thread_id = selected_thread_id
-                    st.session_state.chat_history = get_all_thread_messages(selected_thread_id)
-                    st.experimental_rerun()
-
+from prompts import (
+    CHAT_TEMPLATE, INITIAL_TEMPLATE, CORRECTION_CONTEXT,
+    COMPLETION_CONTEXT, OPTIMIZATION_CONTEXT, GENERAL_ASSISTANT_CONTEXT,
+    GENERATION_CONTEXT, COMMENTING_CONTEXT, EXPLANATION_CONTEXT,
+    LEETCODE_CONTEXT, SHORTENING_CONTEXT
+)
+from database import create_messages_db, write_to_messages_db, get_all_thread_messages,get_unique_thread_ids
+# Core application functionality
+class CodeBuddyConsole:
+    def __init__(self):
+        self.current_state = {
+            'chat_history': [],
+            'initial_input': "",
+            'initial_context': "",
+            'scenario_context': "",
+            'thread_id': "",
+            'docs_processed': False,
+            'docs_chain': None,
+            'uploaded_docs': None,
+            'language': "Python",
+            'scenario': "General Assistant",
+            'temperature': 0.5,
+            'libraries': []
+        }
+        
+        self.scenario_map = {
+            "1": ("General Assistant", GENERAL_ASSISTANT_CONTEXT),
+            "2": ("Code Correction", CORRECTION_CONTEXT),
+            "3": ("Code Completion", COMPLETION_CONTEXT),
+            "4": ("Code Optimization", OPTIMIZATION_CONTEXT),
+            "5": ("Code Generation", GENERATION_CONTEXT),
+            "6": ("Code Commenting", COMMENTING_CONTEXT),
+            "7": ("Code Explanation", EXPLANATION_CONTEXT),
+            "8": ("LeetCode Solver", LEETCODE_CONTEXT),
+            "9": ("Code Shortener", SHORTENING_CONTEXT)
+        }
+        
+        self.languages = ['Python', 'GoLang', 'TypeScript', 'JavaScript', 
+                         'Java', 'C', 'C++', 'C#', 'R', 'SQL']
+        
+        create_messages_db()
+    
+    def clear_screen(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
+    
+    def show_header(self):
+        self.clear_screen()
+        print("=== CodeBuddy Console ===")
+        print(f"Current Settings - Language: {self.current_state['language']}, "
+              f"Scenario: {self.current_state['scenario']}, "
+              f"Temp: {self.current_state['temperature']}")
+        print("-------------------------")
+    
+    def main_menu(self):
+        self.show_header()
+        print("1. Start New Chat")
+        print("2. Load Previous Chat")
+        print("3. Change Settings")
+        print("4. Process Documents")
+        print("5. Exit")
+        choice = input("Select option: ")
+        return choice
+    
+    def settings_menu(self):
+        self.show_header()
+        print("=== Settings ===")
+        
+        # Language selection
+        print("\nAvailable Languages:")
+        for i, lang in enumerate(self.languages, 1):
+            print(f"{i}. {lang}")
+        lang_choice = input(f"Select language (1-{len(self.languages)}): ")
+        self.current_state['language'] = self.languages[int(lang_choice)-1]
+        
+        # Scenario selection
+        print("\nAvailable Scenarios:")
+        for key in self.scenario_map:
+            print(f"{key}. {self.scenario_map[key][0]}")
+        scenario_choice = input("Select scenario (1-9): ")
+        self.current_state['scenario'], self.current_state['scenario_context'] = self.scenario_map[scenario_choice]
+        
+        # Temperature
+        temp = float(input("Enter temperature (0.0-1.0): "))
+        self.current_state['temperature'] = temp
+        
+        # Python libraries
+        if self.current_state['language'] == "Python":
+            print("\nAvailable Python Libraries:")
+            python_libs = ['SQLite', 'PyGame', 'Seaborn', "Pandas", 'Numpy', 
+                          'Scipy', 'Scikit-Learn', 'PyTorch', 'TensorFlow', 
+                          'Streamlit', 'Flask', 'FastAPI']
+            for i, lib in enumerate(python_libs, 1):
+                print(f"{i}. {lib}")
+            lib_choices = input("Select libraries (comma-separated, leave empty to skip): ")
+            if lib_choices:
+                indices = [int(c.strip())-1 for c in lib_choices.split(",")]
+                self.current_state['libraries'] = [python_libs[i] for i in indices]
+    
+    def document_processing(self):
+        self.show_header()
+        print("=== Document Processing ===")
+        file_paths = input("Enter PDF file paths (comma-separated): ").split(",")
+        
+        if file_paths:
+            raw_text = self.get_pdf_text([fp.strip() for fp in file_paths])
+            text_chunks = self.get_text_chunks(raw_text)
+            vectorstore = self.get_vectorstore(text_chunks)
+            self.current_state['docs_chain'] = self.create_retrieval_chain(vectorstore)
+            self.current_state['docs_processed'] = True
+            self.current_state['uploaded_docs'] = file_paths
+            print(f"\nProcessed {len(file_paths)} documents successfully!")
         else:
-            st.write("Login for additional features")
-
-
-def display_history():
-    with st.container():
-        for i, message in enumerate(reversed(st.session_state.chat_history)):
-            if i % 2 == 0:
-                st.markdown(bot_template.replace("{{MSG}}", message), unsafe_allow_html=True)
-            else:
-                st.markdown(user_template.replace("{{MSG}}", message), unsafe_allow_html=True)
-
-
-def user_initial_submit():
-    global code_input, code_context
-    initial_template = PromptTemplate(
-        input_variables=['input', 'language', 'scenario', 'scenario_context', 'code_context', 'libraries'],
-        template=INITIAL_TEMPLATE
-    )
-    if pdf_docs and st.session_state.docs_processed:
-        initial_llm_chain = st.session_state.docs_chain
-    else:
-        initial_llm_chain = create_llm_chain(prompt_template=initial_template)
-    code_input = st.text_area(label="User Code", height=200)
-    code_context = st.text_area(label="Additional Context", height=100)
-    if st.button("Submit Initial Input") and (code_input or code_context):
-        with st.spinner('Generating Response...'):
-            if st.session_state.docs_processed:
-                llm_input = initial_template.format(
-                    input=code_input,
-                    code_context=code_context,
-                    language=language,
-                    scenario=scenario,
-                    scenario_context=scenario_context,
-                    libraries=libraries
-                )
-                initial_response = initial_llm_chain({'question': llm_input})['answer']
-            else:
-                initial_response = initial_llm_chain.run(
-                    input=code_input,
-                    code_context=code_context,
-                    language=language,
-                    scenario=scenario,
-                    scenario_context=scenario_context,
-                    libraries=libraries
-                )
-        st.session_state.update({
-            'initial_input': code_input,
-            'initial_context': code_context,
-            'chat_history': [
-                f"USER: CODE CONTEXT: {code_context} CODE INPUT: {code_input}",
-                f"AI: {initial_response}"
+            self.current_state['docs_processed'] = False
+        input("\nPress Enter to continue...")
+    
+    def get_pdf_text(self, pdf_paths):
+        text = ""
+        for path in pdf_paths:
+            with open(path, 'rb') as f:
+                pdf_reader = PdfReader(f)
+                for page in pdf_reader.pages:
+                    text += page.extract_text()
+        return text
+    
+    def get_text_chunks(self, text):
+        text_splitter = CharacterTextSplitter(
+            separator="\n",
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len
+        )
+        return text_splitter.split_text(text)
+    
+    def get_vectorstore(self, text_chunks):
+        embeddings = OpenAIEmbeddings()
+        return FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+    
+    def create_retrieval_chain(self, vectorstore):
+        llm = Ollama(model="llama3.1:latest", temperature=self.current_state['temperature'])
+        memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
+        return ConversationalRetrievalChain.from_llm(
+            llm=llm,
+            retriever=vectorstore.as_retriever(),
+            memory=memory
+        )
+    
+    def create_llm_chain(self, prompt_template):
+        memory = ConversationBufferMemory(input_key="input", memory_key="chat_history")
+        llm = Ollama(model="llama3.1:latest", temperature=self.current_state['temperature'])
+        return LLMChain(llm=llm, prompt=prompt_template, memory=memory)
+    
+    def start_new_chat(self):
+        self.show_header()
+        print("=== New Chat ===")
+        code_input = input("Enter your code (press Enter twice to finish):\n")
+        code_context = input("\nEnter any additional context: ")
+        
+        # Create initial prompt
+        initial_template = PromptTemplate(
+            input_variables=['input', 'language', 'scenario', 'scenario_context', 'code_context', 'libraries'],
+            template=INITIAL_TEMPLATE
+        )
+        
+        if self.current_state['docs_processed']:
+            chain = self.current_state['docs_chain']
+            llm_input = initial_template.format(
+                input=code_input,
+                code_context=code_context,
+                language=self.current_state['language'],
+                scenario=self.current_state['scenario'],
+                scenario_context=self.current_state['scenario_context'],
+                libraries=self.current_state['libraries']
+            )
+            response = chain({'question': llm_input})['answer']
+        else:
+            chain = self.create_llm_chain(initial_template)
+            response = chain.run(
+                input=code_input,
+                code_context=code_context,
+                language=self.current_state['language'],
+                scenario=self.current_state['scenario'],
+                scenario_context=self.current_state['scenario_context'],
+                libraries=self.current_state['libraries']
+            )
+        
+        # Update state
+        self.current_state['initial_input'] = code_input
+        self.current_state['initial_context'] = code_context
+        self.current_state['thread_id'] = (code_context + code_input)[:40]
+        self.current_state['chat_history'] = [
+            f"USER: CODE CONTEXT: {code_context} CODE INPUT: {code_input}",
+            f"AI: {response}"
+        ]
+        
+        # Write to DB
+        write_to_messages_db(
+            self.current_state['thread_id'],
+            'USER',
+            f"USER: CODE CONTEXT: {code_context} CODE INPUT: {code_input}"
+        )
+        write_to_messages_db(
+            self.current_state['thread_id'],
+            'AI',
+            f"AI: {response}"
+        )
+        
+        print("\nAI Response:")
+        print(response)
+        input("\nPress Enter to continue conversation...")
+        self.chat_loop()
+    
+    def chat_loop(self):
+        chat_template = PromptTemplate(
+            input_variables=[
+                'input', 'language', 'scenario', 'scenario_context',
+                'chat_history', 'libraries', 'code_input', 
+                'code_context', 'most_recent_ai_message'
             ],
-        })
-        st.session_state.thread_id = (code_context + code_input)[:40]
-        write_to_messages_db(
-            thread_id=st.session_state.thread_id,
-            role='USER',
-            message=f"USER: CODE CONTEXT: {code_context} CODE INPUT: {code_input}"
+            template=CHAT_TEMPLATE
         )
-        write_to_messages_db(
-            thread_id=st.session_state.thread_id,
-            role='AI',
-            message=f"AI: {initial_response}"
-        )
-
-
-def user_message():
-    chat_template = PromptTemplate(
-        input_variables=[
-            'input', 'language', 'scenario', 'scenario_context', 
-            'chat_history', 'libraries', 'code_input', 
-            'code_context', 'most_recent_ai_message'
-        ],
-        template=CHAT_TEMPLATE
-    )
-    if st.session_state.docs_processed:
-        chat_llm_chain = st.session_state.docs_chain
-    else:
-        chat_llm_chain = create_llm_chain(prompt_template=chat_template)
-    if st.session_state.chat_history:
-        user_message = st.text_area("Further Questions for Coding AI?", key="user_input", height=100)
-        if st.button("Submit Message") and user_message:
-            with st.spinner('Generating Response...'):
-                most_recent_ai_message = st.session_state.chat_history[-1]
-                if st.session_state.docs_processed:
-                    chat_input = chat_template.format(
-                        input=user_message,
-                        language=language,
-                        scenario=scenario,
-                        scenario_context=scenario_context,
-                        libraries=libraries,
-                        code_input=st.session_state.initial_input,
-                        code_context=st.session_state.initial_context,
-                        most_recent_ai_message=most_recent_ai_message
-                    )
-                    chat_response = chat_llm_chain({'question': chat_input})['answer']
+        
+        while True:
+            self.show_header()
+            print("=== Chat History ===")
+            for msg in self.current_state['chat_history'][-6:]:
+                if msg.startswith("USER:"):
+                    print(f"> User: {msg[6:]}")
                 else:
-                    chat_response = chat_llm_chain.run(
-                        input=user_message,
-                        language=language,
-                        scenario=scenario,
-                        scenario_context=scenario_context,
-                        chat_history=st.session_state.chat_history,
-                        libraries=libraries,
-                        code_input=st.session_state.initial_input,
-                        code_context=st.session_state.initial_context,
-                        most_recent_ai_message=most_recent_ai_message
-                    )
-                st.session_state['chat_history'].append(f"USER: {user_message}")
-                st.session_state['chat_history'].append(f"AI: {chat_response}")
-                write_to_messages_db(
-                    thread_id=st.session_state.thread_id,
-                    role='USER',
-                    message=f"USER: {user_message}"
+                    print(f"> AI: {msg[5:]}")
+            print("\n")
+            
+            user_input = input("Enter your message (or 'exit' to quit): ")
+            if user_input.lower() == 'exit':
+                break
+            
+            if self.current_state['docs_processed']:
+                chain = self.current_state['docs_chain']
+                llm_input = chat_template.format(
+                    input=user_input,
+                    language=self.current_state['language'],
+                    scenario=self.current_state['scenario'],
+                    scenario_context=self.current_state['scenario_context'],
+                    libraries=self.current_state['libraries'],
+                    code_input=self.current_state['initial_input'],
+                    code_context=self.current_state['initial_context'],
+                    most_recent_ai_message=self.current_state['chat_history'][-1]
                 )
-                write_to_messages_db(
-                    thread_id=st.session_state.thread_id,
-                    role='AI',
-                    message=f"AI: {chat_response}"
-                )
-
-def display_file_code(filename):
-    with open(filename, "r") as file:
-        with st.expander(filename, expanded=False):
-            st.code(file.read(), language='python')
-
-def display_history():
-    st.header("Chat History")
-    for message in st.session_state.get('chat_history', []):
-        if message.startswith("USER:"):
-            st.markdown(f"**{message}**")
-        elif message.startswith("AI:"):
-            st.markdown(f"_{message}_")
-
-def reduce_sidebar_width():
-    st.markdown(
-        """
-        <style>
-        [data-testid="stSidebar"] {
-            min-width: 200px !important;
-        }
-        .block-container {
-            max-width: 100% !important;  /* Ensure main content expands */
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-def main():
-    config()
-    reduce_sidebar_width() 
-    create_messages_db()
-    init_ses_states()
-    sidebar()
-
-    if "docs_processed" in st.session_state and st.session_state.docs_processed:
-        code_editor, deploy_tab, docs_tab = st.tabs(['Code Editor', 'Chat Here', 'Doc Analysis'])
-    else:
-        code_editor, deploy_tab = st.tabs(['Code Editor', 'Chat Here'])
-        docs_tab = None  
-
-    with deploy_tab:
-        st.container()  
-        page_title_header()
-        user_initial_submit()
-        user_message()
-        display_history()
-
-    if docs_tab:
-        with docs_tab:
-            st.caption("Coming Soon")
-            if st.session_state.uploaded_docs:
-                for pdf in st.session_state.uploaded_docs:
-                    st.caption(pdf.name)
+                response = chain({'question': llm_input})['answer']
             else:
-                st.write("No documents uploaded yet.")
-
-    with code_editor:
-        code_editor_view()
+                chain = self.create_llm_chain(chat_template)
+                response = chain.run(
+                    input=user_input,
+                    language=self.current_state['language'],
+                    scenario=self.current_state['scenario'],
+                    scenario_context=self.current_state['scenario_context'],
+                    chat_history=self.current_state['chat_history'],
+                    libraries=self.current_state['libraries'],
+                    code_input=self.current_state['initial_input'],
+                    code_context=self.current_state['initial_context'],
+                    most_recent_ai_message=self.current_state['chat_history'][-1]
+                )
+            
+            # Update state and DB
+            self.current_state['chat_history'].extend([
+                f"USER: {user_input}",
+                f"AI: {response}"
+            ])
+            write_to_messages_db(
+                self.current_state['thread_id'],
+                'USER',
+                f"USER: {user_input}"
+            )
+            write_to_messages_db(
+                self.current_state['thread_id'],
+                'AI',
+                f"AI: {response}"
+            )
+            
+            print("\nAI Response:")
+            print(response)
+            input("\nPress Enter to continue...")
+    
+    def load_previous_chat(self):
+        self.show_header()
+        print("=== Previous Chats ===")
+        threads = get_unique_thread_ids()
+        if not threads:
+            input("No previous chats found. Press Enter to return...")
+            return
+        
+        for i, thread in enumerate(threads, 1):
+            print(f"{i}. {thread}")
+        choice = int(input("\nSelect chat to load: ")) - 1
+        self.current_state['thread_id'] = threads[choice]
+        self.current_state['chat_history'] = get_all_thread_messages(threads[choice])
+        print("\nLoaded chat history:")
+        for msg in self.current_state['chat_history'][-6:]:
+            print(f"> {msg}")
+        input("\nPress Enter to continue...")
+        self.chat_loop()
+    
+    def run(self):
+        while True:
+            choice = self.main_menu()
+            if choice == '1':
+                self.start_new_chat()
+            elif choice == '2':
+                self.load_previous_chat()
+            elif choice == '3':
+                self.settings_menu()
+            elif choice == '4':
+                self.document_processing()
+            elif choice == '5':
+                print("Exiting CodeBuddy...")
+                break
+            else:
+                print("Invalid choice, please try again.")
+                input("Press Enter to continue...")
 
 if __name__ == "__main__":
-    main()
+    app = CodeBuddyConsole()
+    app.run()
