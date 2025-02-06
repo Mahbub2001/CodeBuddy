@@ -9,7 +9,7 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt, QTimer
 from editor import CodeEditor
 from explorer_sidebar import ExplorerSidebar
-
+from worker import AIWorker
 from main import CodeBuddyConsole
 class IDE(QMainWindow):
     def __init__(self):
@@ -223,14 +223,15 @@ class IDE(QMainWindow):
     def assist_code(self):
         editor = self.get_current_editor()
         assistant = self.assistantSelector.currentText()
-        code_optional_scenarios = ["Code Generation", "LeetCode Solver","General Assistant"]
+        code_optional_scenarios = ["Code Generation", "LeetCode Solver", "General Assistant"]
+
         if assistant not in code_optional_scenarios:
             if not editor or not editor.toPlainText().strip():
                 self.outputConsole.setText("⚠️ No code to assist!")
                 return
             code = editor.toPlainText()
         else:
-            code = ""  
+            code = ""
 
         prompt = self.aiPanel.toPlainText()
         if not prompt.strip():
@@ -239,10 +240,15 @@ class IDE(QMainWindow):
 
         language = self.languageSelector.currentText().lower()
 
-        try:
-            response = self.code_buddy.process_query(language, code, prompt, assistant)
-            self.aiPanel.setText(f"💡 AI Code Assistant ({assistant}):\n\n{response}")
-        except ValueError as e:
-            self.aiPanel.setText(f"⚠️ Error: {str(e)}")
-        except Exception as e:
-            self.aiPanel.setText(f"⚠️ An unexpected error occurred: {str(e)}")
+        self.aiPanel.setText("⏳ AI Code Assistant is processing...")
+
+        self.worker = AIWorker(self.code_buddy, language, code, prompt, assistant)
+        self.worker.result_signal.connect(self.update_ai_response)
+        self.worker.error_signal.connect(self.update_ai_error)
+        self.worker.start()
+
+    def update_ai_response(self, response):
+        self.aiPanel.setText(f"💡 AI Code Assistant:\n\n{response}")
+
+    def update_ai_error(self, error_message):
+        self.aiPanel.setText(error_message)

@@ -62,7 +62,7 @@ class CodeBuddyConsole:
         results = self.search_pdf(query)
 
         documents = results.get("documents", [])
-        print(f"Documents: {documents}")
+        # print(f"Documents: {documents}")
         
         return [doc for doc in documents if isinstance(doc, str)]
 
