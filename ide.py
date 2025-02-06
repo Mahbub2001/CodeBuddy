@@ -64,7 +64,8 @@ class IDE(QMainWindow):
         self.rightControls.setLayout(self.rightControlsLayout)
 
         self.languageSelector = QComboBox()
-        self.languageSelector.addItems(["C", "C++", "Java", "Python"])
+        # self.languageSelector.addItems(["C", "C++", "Java", "Python"])
+        self.languageSelector.addItems(["C"])
         self.rightControlsLayout.addWidget(QLabel("Language:"))
         self.rightControlsLayout.addWidget(self.languageSelector)
 
@@ -222,7 +223,7 @@ class IDE(QMainWindow):
     def assist_code(self):
         editor = self.get_current_editor()
         assistant = self.assistantSelector.currentText()
-        code_optional_scenarios = ["Code Generation", "LeetCode Solver"]
+        code_optional_scenarios = ["Code Generation", "LeetCode Solver","General Assistant"]
         if assistant not in code_optional_scenarios:
             if not editor or not editor.toPlainText().strip():
                 self.outputConsole.setText("⚠️ No code to assist!")
