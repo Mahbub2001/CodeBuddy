@@ -1,9 +1,9 @@
 from sentence_transformers import SentenceTransformer
 import chromadb
-import fitz 
+import pymupdf 
 
 def extract_text_from_pdf(pdf_path):
-    doc = fitz.open(pdf_path)
+    doc = pymupdf.open(pdf_path)
     text = "\n".join(page.get_text() for page in doc)
     return text
 
