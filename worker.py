@@ -14,8 +14,8 @@ class AIWorker(QThread):
 
     def run(self):
         try:
-            response = self.code_buddy.process_query(self.language, self.code, self.prompt, self.assistant)
-            self.result_signal.emit(response)
+            for chunk in self.code_buddy.process_query_stream(self.language, self.code, self.prompt, self.assistant):
+                self.result_signal.emit(chunk)
         except ValueError as e:
             self.error_signal.emit(f"⚠️ Error: {str(e)}")
         except Exception as e:

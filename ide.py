@@ -248,7 +248,11 @@ class IDE(QMainWindow):
         self.worker.start()
 
     def update_ai_response(self, response):
-        self.aiPanel.setText(f"💡 AI Code Assistant:\n\n{response}")
+        current_text = self.aiPanel.toPlainText()
+        if current_text == "⏳ AI Code Assistant is processing...":
+            self.aiPanel.setText(f"💡 AI Code Assistant:\n\n{response}")
+        else:
+            self.aiPanel.append(response)
 
     def update_ai_error(self, error_message):
         self.aiPanel.setText(error_message)

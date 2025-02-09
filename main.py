@@ -13,10 +13,12 @@ from prompts import (
     LEETCODE_CONTEXT, SHORTENING_CONTEXT
 )
 import sqlite3
+from PyQt6.QtCore import QThread  
 
 def generate_embeddings(text, model_name="sentence-transformers/all-MiniLM-L6-v2"):
     model = SentenceTransformer(model_name)
     return model.encode([text])[0].tolist()  
+
 class CodeBuddyConsole:
     def __init__(self):
         self.current_state = {
@@ -51,28 +53,7 @@ class CodeBuddyConsole:
         
         create_messages_db()
         
-        
-        # self.chroma_client = chromadb.PersistentClient(path="./chroma_db")  
-        # self.db = self.chroma_client.get_or_create_collection(name="pdf_embeddings")
-    
-    # def generate_embeddings(self, text, model_name="sentence-transformers/all-MiniLM-L6-v2"):
-    #     model = SentenceTransformer(model_name)
-    #     return model.encode([text])[0].tolist()
-    
-    # def search_pdf(self, query, top_k=3, model_name="sentence-transformers/all-MiniLM-L6-v2"):
-    #     query_embedding = self.generate_embeddings(query, model_name)
-    #     results = self.db.query(query_embeddings=[query_embedding], n_results=top_k)
-    #     return results
-
-    # def retrieve_relevant_docs(self, query):
-    #     results = self.search_pdf(query)
-
-    #     documents = results.get("documents", [])
-    #     # print(f"Documents: {documents}")
-        
-    #     return [doc for doc in documents if isinstance(doc, str)]
-    
-    def retrieve_relevant_docs(self,query, top_k=3, model_name="sentence-transformers/all-MiniLM-L6-v2"):
+    def retrieve_relevant_docs(self, query, top_k=3, model_name="sentence-transformers/all-MiniLM-L6-v2"):
         conn = sqlite3.connect("embeddings.db")
         cursor = conn.cursor()
 
@@ -92,12 +73,9 @@ class CodeBuddyConsole:
 
         results.sort(reverse=True, key=lambda x: x[0])
         
-        # print(f"Results: {results[:top_k]}")
-
         return results[:top_k]
 
-    def process_query(self, language, code, query, scenario):
-        """Process a query with document knowledge before querying the LLM."""
+    def process_query_stream(self, language, code, query, scenario):
         if scenario not in self.scenario_map:
             raise ValueError(f"Invalid scenario. Choose from: {list(self.scenario_map.keys())}")
         
@@ -108,8 +86,6 @@ class CodeBuddyConsole:
         relevant_docs = self.retrieve_relevant_docs(query)
         docs_text = "\n\n".join([doc[3] for doc in relevant_docs])
         
-        # print(f"Docs Text: {docs_text}")
-
         initial_template = PromptTemplate(
             input_variables=['input', 'language', 'scenario', 'scenario_context', 'code_context', 'libraries', 'docs'],
             template=INITIAL_TEMPLATE
@@ -126,8 +102,12 @@ class CodeBuddyConsole:
             docs=docs_text    
         )
         
-        return response
-    
+        lines = response.splitlines()
+        for line in lines:
+            if line.strip(): 
+                yield line + "\n"  
+                QThread.msleep(100)  
+                
     def create_llm_chain(self, prompt_template):
         memory = ConversationBufferMemory(input_key="input", memory_key="chat_history")
         llm = Ollama(model="qwen2.5-coder:7b", temperature=self.current_state['temperature'])
