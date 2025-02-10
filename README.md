@@ -7,7 +7,7 @@ CodeBuddy is an AI-powered code assistant designed to streamline coding tasks wi
 - **AI-Powered Code Assistance**: Get real-time help with code correction, completion, optimization, and generation.
 - **LeetCode Solver**: AI-generated solutions for coding problems.
 - **Code Shortener**: Simplify and refactor your code efficiently.
-- **Multi-Language Support**: Supports C, C++, Java, Python, and more.
+- **Multi-Language Support**: Supports Currently C, C++. But Later It will Upgrade for Java, Python, and more.
 - **Semantic Search**: Retrieve relevant documentation and code snippets using embeddings.
 - **Interactive IDE**: Includes a file explorer, code editor, and output console.
 - **Auto-Save**: Ensures your work is saved at regular intervals.
@@ -81,7 +81,7 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 - **Sentence Transformers** for text embeddings.
 
 ## Upcoming Work
-- Implement Web scraping for better result
+- Implement Web scraping for Knowledge 
 - Fine Tune LLM
 - Another New Features 
 
