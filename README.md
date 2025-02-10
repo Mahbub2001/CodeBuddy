@@ -64,13 +64,6 @@ CodeBuddy/
 - **Assistant Selection**: Pick an AI assistant (e.g., Code Correction, Completion, Generation).
 - **Auto-Save**: Adjust auto-save settings in `ui.py`.
 
-## Contributing
-Contributions are welcome! Follow these steps:
-1. Fork the repository.
-2. Create a new branch: `git checkout -b feature/YourFeatureName`
-3. Commit changes: `git commit -m 'Add feature XYZ'`
-4. Push to branch: `git push origin feature/YourFeatureName`
-5. Open a pull request.
 
 ## License
 This project is licensed under the MIT License. See the `LICENSE` file for details.
