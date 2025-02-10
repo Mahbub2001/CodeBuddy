@@ -37,7 +37,7 @@ CodeBuddy is an AI-powered code assistant designed to streamline coding tasks wi
    ```
 4. **Run the application**:
    ```bash
-   python main.py
+   python ui.py
    ```
 
 ## Usage
