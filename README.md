@@ -41,7 +41,7 @@ CodeBuddy is an AI-powered code assistant designed to streamline coding tasks wi
    ```
 
 ## Usage
-1. **Launch the IDE**: Run `python main.py` to start CodeBuddy.
+1. **Launch the IDE**: Run `python ui.py` to start CodeBuddy.
 2. **Open or Create a File**: Use the file explorer to manage your files.
 3. **Write Code**: Utilize the editor for writing and modifying code.
 4. **Use AI Assistance**: Select an AI assistant and enter a prompt for real-time suggestions.
