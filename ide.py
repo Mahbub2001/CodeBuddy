@@ -1,15 +1,12 @@
 import os
-import tempfile
-import subprocess
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QTextEdit,
-    QTextBrowser, QToolBar, QPushButton, QSplitter, QFileDialog, QMessageBox,QComboBox, QLabel, QFrame
+    QTextBrowser, QToolBar, QPushButton, QSplitter, QFileDialog, QMessageBox,QComboBox, QLabel, QFrame,QMenu
 )
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont,QCursor,QAction
 from PyQt6.QtCore import Qt, QTimer
 from editor import CodeEditor
 from explorer_sidebar import ExplorerSidebar
-from worker import AIWorker
 from main import CodeBuddyConsole
 from compile_run import CompileRun
 from ai_assistant import AIAssistantHandler
@@ -94,6 +91,8 @@ class IDE(QMainWindow):
         self.aiPanel.setFont(QFont("Arial", 11))
         self.aiPanel.setPlaceholderText("💡 AI Code Assistant: Write your prompt here...")
         self.rightSidebarLayout.addWidget(self.aiPanel)
+        
+        self.aiPanel.mouseReleaseEvent = self.showSelectionMenu
 
         self.mainSplitter.addWidget(self.rightSidebar)
 
@@ -179,3 +178,26 @@ class IDE(QMainWindow):
 
     def clear_output(self):
         self.outputConsole.clear()
+        
+    def showSelectionMenu(self, event):
+        if self.aiPanel.textCursor().hasSelection():
+            menu = QMenu(self)
+
+            copyAction = QAction("Copy", self)
+            cutAction = QAction("Cut", self)
+            pasteAction = QAction("Paste", self)
+            deleteAction = QAction("Delete", self)
+
+            copyAction.triggered.connect(self.aiPanel.copy)
+            cutAction.triggered.connect(self.aiPanel.cut)
+            pasteAction.triggered.connect(self.aiPanel.paste)
+            deleteAction.triggered.connect(self.aiPanel.delete)
+
+            menu.addAction(copyAction)
+            menu.addAction(cutAction)
+            menu.addAction(pasteAction)
+            menu.addAction(deleteAction)
+
+            menu.exec(QCursor.pos())
+
+        QTextEdit.mouseReleaseEvent(self.aiPanel, event)
