@@ -11,6 +11,7 @@ from editor import CodeEditor
 from explorer_sidebar import ExplorerSidebar
 from worker import AIWorker
 from main import CodeBuddyConsole
+from compile_run import CompileRun
 class IDE(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -20,6 +21,8 @@ class IDE(QMainWindow):
         self.initAutoSave()
         
         self.code_buddy = CodeBuddyConsole()
+        self.compile_run = CompileRun(self.outputConsole) 
+
 
     def initUI(self):
         centralWidget = QWidget(self)
@@ -110,7 +113,7 @@ class IDE(QMainWindow):
         self.addToolBar(toolbar)
 
         runButton = QPushButton("Run")
-        runButton.clicked.connect(self.compile_and_run)
+        runButton.clicked.connect(self.run_code)  
         toolbar.addWidget(runButton)
 
         clearButton = QPushButton("Clear Output")
@@ -135,6 +138,15 @@ class IDE(QMainWindow):
 
     def get_current_editor(self):
         return self.tabWidget.currentWidget()
+    
+    def run_code(self):
+        editor = self.get_current_editor()
+        if not editor:
+            return
+
+        code = editor.toPlainText()
+        language = self.languageSelector.currentText().lower()
+        self.compile_run.compile_and_run(code, language)
 
     def open_file(self):
         fileName, _ = QFileDialog.getOpenFileName(self, "Open File", "", "All Files (*)")
@@ -164,61 +176,61 @@ class IDE(QMainWindow):
     def clear_output(self):
         self.outputConsole.clear()
 
-    def compile_and_run(self):
-        editor = self.get_current_editor()
-        if not editor:
-            return
+    # def compile_and_run(self):
+    #     editor = self.get_current_editor()
+    #     if not editor:
+    #         return
 
-        code = editor.toPlainText()
-        if not code.strip():
-            self.outputConsole.setText("⚠️ No code to compile!")
-            return
+    #     code = editor.toPlainText()
+    #     if not code.strip():
+    #         self.outputConsole.setText("⚠️ No code to compile!")
+    #         return
 
-        language = self.languageSelector.currentText().lower()
-        with tempfile.TemporaryDirectory() as tempdir:
-            output_file = os.path.join(tempdir, 'temp.out')
-            if language == "c":
-                compileCommand = ['gcc', '-x', 'c', '-', '-o', output_file]
-            elif language == "c++":
-                compileCommand = ['g++', '-x', 'c++', '-', '-o', output_file]
-            elif language == "java":
-                compileCommand = ['javac', '-d', tempdir, '-']
-                output_file = os.path.join(tempdir, 'Main')
-            elif language == "python":
-                compileCommand = ['python3', '-c', code]
-                output_file = None
-            else:
-                self.outputConsole.setText("❌ Unsupported language!")
-                return
+    #     language = self.languageSelector.currentText().lower()
+    #     with tempfile.TemporaryDirectory() as tempdir:
+    #         output_file = os.path.join(tempdir, 'temp.out')
+    #         if language == "c":
+    #             compileCommand = ['gcc', '-x', 'c', '-', '-o', output_file]
+    #         elif language == "c++":
+    #             compileCommand = ['g++', '-x', 'c++', '-', '-o', output_file]
+    #         elif language == "java":
+    #             compileCommand = ['javac', '-d', tempdir, '-']
+    #             output_file = os.path.join(tempdir, 'Main')
+    #         elif language == "python":
+    #             compileCommand = ['python3', '-c', code]
+    #             output_file = None
+    #         else:
+    #             self.outputConsole.setText("❌ Unsupported language!")
+    #             return
 
-            try:
-                if language != "python":
-                    compileProcess = subprocess.Popen(
-                        compileCommand, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                    )
-                    compileStdout, compileStderr = compileProcess.communicate(input=code.encode('utf-8'))
-                    if compileProcess.returncode != 0:
-                        self.outputConsole.setText(f"❌ Compilation Error:\n\n{compileStderr.decode()}")
-                        return
+    #         try:
+    #             if language != "python":
+    #                 compileProcess = subprocess.Popen(
+    #                     compileCommand, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    #                 )
+    #                 compileStdout, compileStderr = compileProcess.communicate(input=code.encode('utf-8'))
+    #                 if compileProcess.returncode != 0:
+    #                     self.outputConsole.setText(f"❌ Compilation Error:\n\n{compileStderr.decode()}")
+    #                     return
 
-                if language == "python":
-                    runProcess = subprocess.Popen(
-                        compileCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                    )
-                else:
-                    runProcess = subprocess.Popen(
-                        output_file, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                    )
+    #             if language == "python":
+    #                 runProcess = subprocess.Popen(
+    #                     compileCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    #                 )
+    #             else:
+    #                 runProcess = subprocess.Popen(
+    #                     output_file, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    #                 )
 
-                executionStdout, executionStderr = runProcess.communicate()
+    #             executionStdout, executionStderr = runProcess.communicate()
 
-                if executionStderr:
-                    self.outputConsole.setText(f"❌ Execution Error:\n\n{executionStderr.decode()}")
-                else:
-                    self.outputConsole.setText(f"✅ Output:\n\n{executionStdout.decode()}")
+    #             if executionStderr:
+    #                 self.outputConsole.setText(f"❌ Execution Error:\n\n{executionStderr.decode()}")
+    #             else:
+    #                 self.outputConsole.setText(f"✅ Output:\n\n{executionStdout.decode()}")
 
-            except Exception as e:
-                self.outputConsole.setText(f"⚠️ Error occurred: {str(e)}")
+    #         except Exception as e:
+    #             self.outputConsole.setText(f"⚠️ Error occurred: {str(e)}")
 
     def assist_code(self):
         editor = self.get_current_editor()

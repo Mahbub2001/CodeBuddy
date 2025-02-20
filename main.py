@@ -85,7 +85,7 @@ class CodeBuddyConsole:
 
         relevant_docs = self.retrieve_relevant_docs(query)
         docs_text = "\n\n".join([doc[3] for doc in relevant_docs])
-        print(docs_text)
+        # print(docs_text)
         
         initial_template = PromptTemplate(
             input_variables=['input', 'language', 'scenario', 'scenario_context', 'code_context', 'libraries', 'docs'],
