@@ -12,16 +12,20 @@ from explorer_sidebar import ExplorerSidebar
 from worker import AIWorker
 from main import CodeBuddyConsole
 from compile_run import CompileRun
+from ai_assistant import AIAssistantHandler
 class IDE(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CODEBUDDY")
         self.setGeometry(100, 100, 1200, 800)
+
+        self.ai_assistant = AIAssistantHandler(self) 
+
         self.initUI()
         self.initAutoSave()
-        
+
         self.code_buddy = CodeBuddyConsole()
-        self.compile_run = CompileRun(self.outputConsole) 
+        self.compile_run = CompileRun(self.outputConsole)
 
 
     def initUI(self):
@@ -81,7 +85,7 @@ class IDE(QMainWindow):
         self.rightControlsLayout.addWidget(self.assistantSelector)
 
         self.assistButton = QPushButton("Assist")
-        self.assistButton.clicked.connect(self.assist_code)
+        self.assistButton.clicked.connect(self.ai_assistant.assist_code)
         self.rightControlsLayout.addWidget(self.assistButton)
 
         self.rightSidebarLayout.addWidget(self.rightControls)
@@ -175,40 +179,3 @@ class IDE(QMainWindow):
 
     def clear_output(self):
         self.outputConsole.clear()
-        
-    def assist_code(self):
-        editor = self.get_current_editor()
-        assistant = self.assistantSelector.currentText()
-        code_optional_scenarios = ["Code Generation", "LeetCode Solver", "General Assistant"]
-
-        if assistant not in code_optional_scenarios:
-            if not editor or not editor.toPlainText().strip():
-                self.outputConsole.setText("⚠️ No code to assist!")
-                return
-            code = editor.toPlainText()
-        else:
-            code = ""
-
-        prompt = self.aiPanel.toPlainText()
-        if not prompt.strip():
-            self.aiPanel.setText("💡 AI Code Assistant: Please write a prompt!")
-            return
-
-        language = self.languageSelector.currentText().lower()
-
-        self.aiPanel.setText("⏳ AI Code Assistant is processing...")
-
-        self.worker = AIWorker(self.code_buddy, language, code, prompt, assistant)
-        self.worker.result_signal.connect(self.update_ai_response)
-        self.worker.error_signal.connect(self.update_ai_error)
-        self.worker.start()
-
-    def update_ai_response(self, response):
-        current_text = self.aiPanel.toPlainText()
-        if current_text == "⏳ AI Code Assistant is processing...":
-            self.aiPanel.setText(f"💡 AI Code Assistant:\n\n{response}")
-        else:
-            self.aiPanel.append(response)
-
-    def update_ai_error(self, error_message):
-        self.aiPanel.setText(error_message)
