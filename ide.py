@@ -191,7 +191,7 @@ class IDE(QMainWindow):
             copyAction.triggered.connect(self.aiPanel.copy)
             cutAction.triggered.connect(self.aiPanel.cut)
             pasteAction.triggered.connect(self.aiPanel.paste)
-            deleteAction.triggered.connect(self.aiPanel.delete)
+            deleteAction.triggered.connect(lambda: self.aiPanel.textCursor().removeSelectedText())
 
             menu.addAction(copyAction)
             menu.addAction(cutAction)
