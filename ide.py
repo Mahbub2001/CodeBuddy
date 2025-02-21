@@ -94,8 +94,14 @@ class IDE(QMainWindow):
         
         self.aiPanel.mouseReleaseEvent = self.showSelectionMenu
 
-        self.mainSplitter.addWidget(self.rightSidebar)
+        self.promptInput = QTextEdit()
+        self.promptInput.setFont(QFont("Arial", 11))
+        self.promptInput.setPlaceholderText("Enter your prompt here...")
+        self.rightSidebarLayout.addWidget(self.promptInput)
+        self.promptInput.setFixedHeight(100) 
 
+
+        self.mainSplitter.addWidget(self.rightSidebar)
         self.mainSplitter.setSizes([200, 600, 200])
 
         self.initToolBar()

@@ -17,9 +17,9 @@ class AIAssistantHandler:
         else:
             code = ""
 
-        prompt = self.ide.aiPanel.toPlainText()
+        prompt = self.ide.promptInput.toPlainText() 
         if not prompt.strip():
-            self.ide.aiPanel.setText("💡 AI Code Assistant: Please write a prompt!")
+            self.ide.promptInput.setText("💡 AI Code Assistant: Please write a prompt!")
             return
 
         language = self.ide.languageSelector.currentText().lower()
