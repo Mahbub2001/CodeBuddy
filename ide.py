@@ -89,14 +89,14 @@ class IDE(QMainWindow):
 
         self.aiPanel = QTextEdit()
         self.aiPanel.setFont(QFont("Arial", 11))
-        self.aiPanel.setPlaceholderText("💡 AI Code Assistant: Write your prompt here...")
+        # self.aiPanel.setPlaceholderText("💡 AI Code Assistant: Write your prompt here...")
         self.rightSidebarLayout.addWidget(self.aiPanel)
         
         self.aiPanel.mouseReleaseEvent = self.showSelectionMenu
 
         self.promptInput = QTextEdit()
         self.promptInput.setFont(QFont("Arial", 11))
-        self.promptInput.setPlaceholderText("Enter your prompt here...")
+        self.promptInput.setPlaceholderText("AI Code Assistant: Write your prompt here...")
         self.rightSidebarLayout.addWidget(self.promptInput)
         self.promptInput.setFixedHeight(100) 
 
