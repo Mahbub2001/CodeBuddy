@@ -103,12 +103,9 @@ class CodeBuddyConsole:
             docs=docs_text    
         )
         
-        lines = response.splitlines()
-        for line in lines:
-            if line.strip(): 
-                yield line + "\n"  
-                QThread.msleep(100)  
-                
+        formatted_response = "\n".join(line for line in response.splitlines() if line.strip())
+        yield formatted_response  
+
     def create_llm_chain(self, prompt_template):
         memory = ConversationBufferMemory(input_key="input", memory_key="chat_history")
         llm = Ollama(model="qwen2.5-coder:7b", temperature=self.current_state['temperature'])

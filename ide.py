@@ -87,10 +87,13 @@ class IDE(QMainWindow):
 
         self.rightSidebarLayout.addWidget(self.rightControls)
 
-        self.aiPanel = QTextEdit()
+        self.aiPanel = QTextBrowser() 
         self.aiPanel.setFont(QFont("Arial", 11))
-        # self.aiPanel.setPlaceholderText("💡 AI Code Assistant: Write your prompt here...")
+        self.aiPanel.setOpenExternalLinks(True)
+        self.aiPanel.setReadOnly(True)
         self.rightSidebarLayout.addWidget(self.aiPanel)
+
+        # self.aiPanel.setPlaceholderText("💡 AI Code Assistant: Write your prompt here...")
         
         self.aiPanel.mouseReleaseEvent = self.showSelectionMenu
 

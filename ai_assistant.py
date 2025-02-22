@@ -24,7 +24,9 @@ class AIAssistantHandler:
 
         language = self.ide.languageSelector.currentText().lower()
 
-        self.ide.aiPanel.setText("⏳ AI Code Assistant is processing...")
+        user_query = self.ide.promptInput.toPlainText().strip()
+        self.ide.aiPanel.append(f'<div style="color: blue;"><b>You:</b> {user_query}</div>')
+        self.ide.aiPanel.append('<div style="color: gray;"><b>AI:</b> ⏳ Processing...</div>')
 
         self.worker = AIWorker(self.ide.code_buddy, language, code, prompt, assistant)
         self.worker.result_signal.connect(self.update_ai_response)
@@ -33,10 +35,11 @@ class AIAssistantHandler:
 
     def update_ai_response(self, response):
         current_text = self.ide.aiPanel.toPlainText()
+        formatted_response = "\n".join(response.splitlines())  
         if current_text == "⏳ AI Code Assistant is processing...":
-            self.ide.aiPanel.setText(f"💡 AI Code Assistant:\n\n{response}")
+            self.ide.aiPanel.setText(f"💡 AI Code Assistant:\n\n{formatted_response}")
         else:
-            self.ide.aiPanel.append(response)
-
+            self.ide.aiPanel.setText(current_text + "\n" + formatted_response) 
     def update_ai_error(self, error_message):
-        self.ide.aiPanel.setText(error_message)
+        self.ide.aiPanel.append(f'<div style="color: red;"><b>Error:</b> {error_message}</div>')
+

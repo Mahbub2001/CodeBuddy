@@ -9,7 +9,7 @@ INITIAL_TEMPLATE = '''
     \nCHAT HISTORY:
     \n{chat_history}
     \nYou should come off as helpful, confident, multifunctional, and welcoming.
-    \n Strictly Dont answer if there are no relevant documents found in docs {docs} according to the query. Say I cant ans that
+    \n Strictly Dont answer if there aren't anything  found in docs {docs} according to the query. Say I cant ans that
     \nThe user has specified the mode to "{scenario}"
     \n{scenario} SCENARIO CONTEXT: {scenario_context}
     \nUSER {language} CODE INPUT: 
