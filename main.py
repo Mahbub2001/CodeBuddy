@@ -5,7 +5,6 @@ from langchain.chains import LLMChain
 from sentence_transformers import SentenceTransformer
 import numpy as np
 # import chromadb
-from database import create_messages_db
 from prompts import (
     CHAT_TEMPLATE, INITIAL_TEMPLATE, CORRECTION_CONTEXT,
     COMPLETION_CONTEXT, OPTIMIZATION_CONTEXT, GENERAL_ASSISTANT_CONTEXT,
@@ -49,10 +48,8 @@ class CodeBuddyConsole:
         }
         
         self.languages = ['Python', 'GoLang', 'TypeScript', 'JavaScript', 
-                          'Java', 'C', 'C++', 'C#', 'R', 'SQL']
-        
-        create_messages_db()
-        
+                          'Java', 'C', 'C++', 'C#', 'R', 'SQL']        
+    
     def retrieve_relevant_docs(self, query, top_k=3, model_name="sentence-transformers/all-MiniLM-L6-v2"):
         conn = sqlite3.connect("embeddings.db")
         cursor = conn.cursor()
@@ -75,7 +72,19 @@ class CodeBuddyConsole:
         
         return results[:top_k]
 
-    def process_query_stream(self, language, code, query, scenario):
+    def get_conversation_history(self, session_id):
+            conn = sqlite3.connect('conversation_history.db')
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT user_query, ai_response FROM conversations
+                WHERE session_id = ?
+                ORDER BY timestamp
+            ''', (session_id,))
+            history = cursor.fetchall()
+            conn.close()
+            return history
+
+    def process_query_stream(self, language, code, query, scenario, session_id):
         if scenario not in self.scenario_map:
             raise ValueError(f"Invalid scenario. Choose from: {list(self.scenario_map.keys())}")
         
@@ -83,28 +92,64 @@ class CodeBuddyConsole:
         self.current_state['scenario_context'] = self.scenario_map[scenario]
         self.current_state['language'] = language
 
+        history = self.get_conversation_history(session_id)  
+        chat_history = self.format_conversation_history(history)
+
         relevant_docs = self.retrieve_relevant_docs(query)
         docs_text = "\n\n".join([doc[3] for doc in relevant_docs])
-        print(docs_text)
+        if not history:
+            prompt_template = PromptTemplate(
+                input_variables=['input', 'language', 'scenario', 'scenario_context', 'code_context', 'libraries', 'docs', 'chat_history'],
+                template=INITIAL_TEMPLATE
+            )
+        else:
+            prompt_template = PromptTemplate(
+                input_variables=['input', 'language', 'scenario', 'scenario_context', 'code_context', 'libraries', 'docs', 'chat_history', 'most_recent_ai_message', 'code_input'],
+                template=CHAT_TEMPLATE
+            )
+            most_recent_ai_message = history[-1][1] if history else ""
+
+        chain = self.create_llm_chain(prompt_template)
         
-        initial_template = PromptTemplate(
-            input_variables=['input', 'language', 'scenario', 'scenario_context', 'code_context', 'libraries', 'docs'],
-            template=INITIAL_TEMPLATE
-        )
+        if not history:
+            response = chain.run(
+                input=code,
+                code_context=query,
+                language=self.current_state['language'],
+                scenario=self.current_state['scenario'],
+                scenario_context=self.current_state['scenario_context'],
+                libraries=self.current_state['libraries'],
+                docs=docs_text,
+                chat_history=chat_history
+            )
+        else:
+            response = chain.run(
+                input=query, 
+                code_context=query,  
+                language=self.current_state['language'],
+                scenario=self.current_state['scenario'],
+                scenario_context=self.current_state['scenario_context'],
+                libraries=self.current_state['libraries'],
+                docs=docs_text,
+                chat_history=chat_history,
+                most_recent_ai_message=most_recent_ai_message,
+                code_input=code  
+            )
         
-        chain = self.create_llm_chain(initial_template)
-        response = chain.run(
-            input=code,
-            code_context=query,
-            language=self.current_state['language'],
-            scenario=self.current_state['scenario'],
-            scenario_context=self.current_state['scenario_context'],
-            libraries=self.current_state['libraries'],
-            docs=docs_text    
-        )
-        
+        conn = sqlite3.connect('conversation_history.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO conversations (session_id, user_query, ai_response)
+            VALUES (?, ?, ?)
+        ''', (session_id, query, response))
+        conn.commit()
+        conn.close()
+
         formatted_response = "\n".join(line for line in response.splitlines() if line.strip())
-        yield formatted_response  
+        yield formatted_response
+    
+    def format_conversation_history(self, history):
+        return "\n".join([f"User: {q}\nAI: {a}" for q, a in history])
 
     def create_llm_chain(self, prompt_template):
         memory = ConversationBufferMemory(input_key="input", memory_key="chat_history")

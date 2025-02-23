@@ -1,8 +1,10 @@
 from worker import AIWorker
+import uuid
 
 class AIAssistantHandler:
     def __init__(self, ide):
         self.ide = ide
+        self.session_id = str(uuid.uuid4()) 
 
     def assist_code(self):
         editor = self.ide.get_current_editor()
@@ -28,7 +30,7 @@ class AIAssistantHandler:
         self.ide.aiPanel.append(f'<div style="color: blue;"><b>You:</b> {user_query}</div>')
         self.ide.aiPanel.append('<div style="color: gray;"><b>AI:</b> ⏳ Processing...</div>')
 
-        self.worker = AIWorker(self.ide.code_buddy, language, code, prompt, assistant)
+        self.worker = AIWorker(self.ide.code_buddy, language, code, prompt, assistant, self.session_id)
         self.worker.result_signal.connect(self.update_ai_response)
         self.worker.error_signal.connect(self.update_ai_error)
         self.worker.start()
@@ -40,6 +42,6 @@ class AIAssistantHandler:
             self.ide.aiPanel.setText(f"💡 AI Code Assistant:\n\n{formatted_response}")
         else:
             self.ide.aiPanel.setText(current_text + "\n" + formatted_response) 
+
     def update_ai_error(self, error_message):
         self.ide.aiPanel.append(f'<div style="color: red;"><b>Error:</b> {error_message}</div>')
-
