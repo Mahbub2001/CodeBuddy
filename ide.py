@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QTextEdit,
     QTextBrowser, QToolBar, QPushButton, QSplitter, QFileDialog, QMessageBox,QComboBox, QLabel, QFrame,QMenu
 )
-from PyQt6.QtGui import QFont,QCursor,QAction
+from PyQt6.QtGui import QFont,QCursor,QAction,QPalette,QColor
 from PyQt6.QtCore import Qt, QTimer
 from editor import CodeEditor
 from explorer_sidebar import ExplorerSidebar
@@ -20,6 +20,7 @@ class IDE(QMainWindow):
 
         self.initUI()
         self.initAutoSave()
+        self.initTheme()
 
         self.code_buddy = CodeBuddyConsole()
         self.compile_run = CompileRun(self.outputConsole)
@@ -108,6 +109,10 @@ class IDE(QMainWindow):
         self.mainSplitter.setSizes([200, 600, 200])
 
         self.initToolBar()
+        
+    def initTheme(self):
+        self.current_theme = "light"
+        self.apply_theme(self.current_theme)
 
     def initAutoSave(self):
         self.autoSaveTimer = QTimer(self)
@@ -143,6 +148,20 @@ class IDE(QMainWindow):
         newTabButton = QPushButton("New Tab")
         newTabButton.clicked.connect(self.add_new_tab)
         toolbar.addWidget(newTabButton)
+        
+        themeMenu = QMenu("Theme", self)
+        lightThemeAction = QAction("Light Theme", self)
+        darkThemeAction = QAction("Dark Theme", self)
+
+        lightThemeAction.triggered.connect(lambda: self.apply_theme("light"))
+        darkThemeAction.triggered.connect(lambda: self.apply_theme("dark"))
+
+        themeMenu.addAction(lightThemeAction)
+        themeMenu.addAction(darkThemeAction)
+
+        themeButton = QPushButton("Theme")
+        themeButton.setMenu(themeMenu)
+        toolbar.addWidget(themeButton)
 
     def add_new_tab(self):
         editor = CodeEditor()
@@ -210,3 +229,44 @@ class IDE(QMainWindow):
             menu.exec(QCursor.pos())
 
         QTextEdit.mouseReleaseEvent(self.aiPanel, event)
+        
+    def apply_theme(self, theme):
+        self.current_theme = theme
+        if theme == "dark":
+            self.set_dark_theme()
+        else:
+            self.set_light_theme()
+
+    def set_dark_theme(self):
+        dark_palette = QPalette()
+        dark_palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+        dark_palette.setColor(QPalette.ColorRole.Base, QColor(35, 35, 35))
+        dark_palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.white)
+        dark_palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+        dark_palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+        dark_palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+        dark_palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+        dark_palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+        dark_palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        dark_palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
+
+        self.setPalette(dark_palette)
+
+    def set_light_theme(self):
+        light_palette = QPalette()
+        light_palette.setColor(QPalette.ColorRole.Window, Qt.GlobalColor.white)
+        light_palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.black)
+        light_palette.setColor(QPalette.ColorRole.Base, Qt.GlobalColor.white)
+        light_palette.setColor(QPalette.ColorRole.AlternateBase, Qt.GlobalColor.lightGray)
+        light_palette.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.white)
+        light_palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.black)
+        light_palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.black)
+        light_palette.setColor(QPalette.ColorRole.Button, Qt.GlobalColor.white)
+        light_palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.black)
+        light_palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+        light_palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        light_palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+
+        self.setPalette(light_palette)
